@@ -1,5 +1,5 @@
 According to a theorem of Belyi, an algebraic complex curve can be defined
-over the the field of algebraic numbers if and only if there exists 
+over the field of algebraic numbers if and only if there exists 
 a regular map from it to the projective line branched over only three points. 
 By composing such a map with an appropriate fractional linear transformation, 
 we may assume that these points are at infinity, 0, and 1. 
@@ -8,7 +8,8 @@ Such a rational function is called a Belyi map.
 To every Belyi map, we associate its passport, which is a list of ramification
 indices at points lying over infinity, 0, and 1. 
 
-In this datatbase, the lists of ramification indices over infinity, 0, and 1 are 
+In this database, the lists of ramification indices over infinity, 0, and 1 are 
 ordered in reverse lexicographic order. To obtain a map with an unordered passport,
 compose with an appropriate automorphism of the projective line.
 
+More detailed instructions are provided in the file data/instructions.pdf
