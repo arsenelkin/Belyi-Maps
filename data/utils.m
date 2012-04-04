@@ -120,13 +120,9 @@ end function;
  * Validate ramification data
  *****************************************************************/
 
-CastPoint := function(pt, K)
-	return [K ! c : c in Eltseq(pt)];
-end function;
+CastPoint := func< pt, K | [K ! c : c in Eltseq(pt)] >;
 
-CastPoints := function(pts, K)
-	return [CastPoint(pt, K) : pt in Seqelt(pts)];
-end function;
+CastPoints := func< pts, K | [CastPoint(pt, K) : pt in Seqelt(pts)] >;
 
 CastEquations := function(eqns, K)
 	KK := Universe(eqns);
@@ -171,29 +167,17 @@ end function;
  ***************************************************************************/
 
 HyperellipticCoefficients := function(f)
-    C, M := CoefficientsAndMonomials(f);
-    F := Parent(f);    
-    result := [Universe(C) | 0, 0];
-    for i in [1..#M] do
-        if M[i] eq (F ! 1) then
-            result[1] := C[i];
-        elif M[i] eq F.2 then
-            result[2] := C[i];
-        else
-            error "Invalid monomial";
-        end if;
-    end for;
-    return result;
+    coeffs := [Coefficients(c)[1] : c in Coefficients(f, 1)];
+    return coeffs cat [ 0 : i in [#coeffs .. 1]];
 end function;
 
-// Only works for elliptic curve in the form y^2 = f(x)
 HyperellipticConjugate := function(f)
     F := Parent(f);
     x := F.1;    
     y := F.2;
     _, h := HyperellipticPolynomials(Curve(F));
     C := HyperellipticCoefficients(f);
-    return C[1] - C[2] * (y + Evaluate(h, x));
+    return Evaluate(C[1],x) - Evaluate(C[2],x) * (y + Evaluate(h, x));
 end function;
 
 HyperellipticNorm := function(f)
@@ -201,30 +185,38 @@ HyperellipticNorm := function(f)
 end function;
 
 //
-// for f = (r(x) + y * s(x))/t(x), returns r, s, t.
-// This function is horrible and possibly buggy. Rewrite it.
+// for f = (p(x) + y * q(x))/r(x), returns p, q, r.
 //
-DecomposeHyperellipticFunction := function(f)
+DecomposeHypFunction := function(f)
     coeffs := HyperellipticCoefficients(f);
     denom := Denominator(coeffs[1]);
-    coeffs[2] *:= Denominator(coeffs[1]);
-    coeffs[1] *:= Denominator(coeffs[1]);
-    denom *:= Denominator(coeffs[2]);
-    coeffs[1] *:= Denominator(coeffs[2]);
-    coeffs[2] *:= Denominator(coeffs[2]);
-    return Numerator(coeffs[1]), Numerator(coeffs[2]), denom;
+    num1 := Numerator(coeffs[1]);
+    coeffs[2] *:= denom;
+    denom2 := Denominator(coeffs[2]);
+    denom *:= denom2;
+    num1 *:= denom2;
+    num2 := Numerator(coeffs[2]);
+    return num1, num2, denom;
 end function;
 
-/***************************************************************************
- * Get the scheme defined by the equations in a list
- ***************************************************************************/
+DecomposeG0Function := function(f)
+    coeffs := Coefficients(f);
+    g := IsEmpty(coeffs) select Zero(Universe(coeffs)) else coeffs[1];
+    return Numerator(g), Denominator(g);
+end function;
 
-GetScheme := function(eqns, sep)
-    assert IsEmpty(sep) or (Universe(sep) cmpeq Universe(eqns));
-    A := AffineSpace(Universe(eqns));
-    Sin := Scheme(A, eqns);
-    Sout := Scheme(A, &*sep);
-    return Sin, Sout;
+ReconstituteCoeffs := func< field, list | [field | field ! coeff : coeff in list] >;
+
+ExtractHypPolys := function(E, phi)
+    poly_f, poly_h := HyperellipticPolynomials(E);
+    poly_p, poly_q, poly_r := DecomposeHypFunction(phi);
+    
+    poly_a := HyperellipticNorm(phi * poly_r);
+    poly_a := Numerator(Coefficients(poly_a)[1]);
+    poly_b := HyperellipticNorm((phi - 1) * poly_r);
+    poly_b := Numerator(Coefficients(poly_b)[1]);
+    
+    return poly_f, poly_h, poly_p, poly_q, poly_r, poly_a, poly_b;
 end function;
 
 /***************************************************************************
@@ -232,14 +224,14 @@ end function;
  ***************************************************************************/
 
 EllipticCurveCoeffsByJAndD := function(j, d)
-    U := Parent(j);
+    U := CoveringStructure(Parent(j), Parent(d));
     if j eq 0 then
-        return [U ! 0, d^3];
+        return [U | 0, d^3];
     elif j eq 1728 then
-        return [U ! d^2, 0];
+        return [U | d^2, 0];
     end if;
     
-    return [U ! -27 * d^2 * j * (j - 1728), 54 * d^3 * j * (j-1728)^2];
+    return [U | -27 * d^2 * j * (j - 1728), 54 * d^3 * j * (j-1728)^2];
 end function;
 
 EllipticCurveByJAndD := function(j, d)
@@ -256,7 +248,8 @@ CountOccurrences := func<list, elt | &+[1 : e in list | e eq elt] >;
  * Factorization routines
  ***********************************************************************************/
 
-IrredicibleDivisors := func< poly | IsZero(poly) select {@ Parent(poly) | @}
+IrredicibleDivisors := func< poly | 
+                IsZero(poly)    select {@ Parent(poly) | @}
                                 else {@ Parent(poly) | fc[1] : fc in Factorization(poly) @} >;
 
 //
@@ -377,7 +370,7 @@ SortingMobiusTransform := function(passport)
         return Reverse(ordered), x / (1 - x);    
     end if;
     
-    ac := list_comp(passport[1], passport[3]) ge 0;
+    ac := list_comp(ordered[1], ordered[3]) ge 0;
         
     if ab then
         if ac then 
@@ -429,4 +422,3 @@ JInvariant := function(C)
     den := -27*s1^4*s4^2 + 18*s1^3*s2*s3*s4 - 4*s1^3*s3^3 - 4*s1^2*s2^3*s4 + s1^2*s2^2*s3^2 + 144*s1^2*s2*s4^2 - 6*s1^2*s3^2*s4 - 80*s1*s2^2*s3*s4 + 18*s1*s2*s3^3 - 192*s1*s3*s4^2 + 16*s2^4*s4 - 4*s2^3*s3^2 - 128*s2^2*s4^2 + 144*s2*s3^2*s4 - 27*s3^4 + 256*s4^3;
     return 256 * num / den;
 end function;
-

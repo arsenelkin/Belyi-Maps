@@ -5,8 +5,6 @@ BelyiRecords_31_31_22 := function()
 records := [ ];
 passport := [[3,1],[3,1],[2,2]];
 
-
-
 /**************** Begin Solution *********************
     passport = [[3,1],[3,1],[2,2]]
     field = Number Field with defining polynomial z^2 - 3 over the Rational Field

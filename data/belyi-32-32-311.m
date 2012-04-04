@@ -5,8 +5,6 @@ BelyiRecords_32_32_311 := function()
 records := [ ];
 passport := [[3,2],[3,2],[3,1,1]];
 
-
-
 /**************** Begin Solution *********************
     passport = [[3,2],[3,2],[3,1,1]]
     field = Rational Field
