@@ -1,22 +1,20 @@
 // This is   belyi-4-4-1111.m
-//load "format.m";
 
-BelyiRecords_4_4_1111 := function()
-records := [ ];
-passport := [[4],[4],[1,1,1,1]];
+
+[* [[4],[4],[1,1,1,1]],
+[
 
 /**************** Begin Solution *********************
     passport = [[4],[4],[1,1,1,1]]
     field = Rational Field
     phi = x^4
  **************** Record *****************************/
-record := rec< G0BelyiRecord |
+rec< G0BelyiRecord |
         passport := [[4],[4],[1,1,1,1]],
         defpoly  := [-1,1],
         coeffs_p := [[0],[0],[0],[0],[1]],
-        coeffs_r := [[1]]>;
-Append(~records, record);
+        coeffs_r := [[1]]
+>
 /**************** End Solution ***********************/
 
-return records, passport;
-end function;
+] *]

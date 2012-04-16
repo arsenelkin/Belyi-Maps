@@ -177,25 +177,6 @@ function AllPossibleSelections(list)
 end function;
 
 /***************************************************************************
- * Separability conditions via discriminant
- ***************************************************************************/
-
-function SeparabilityConditionsTogether(vars)
-    KX := PolynomialRing(Universe(vars));
-    x := KX.1;
-    poly := &*[ KX | x - var : var in vars];
-    return [Discriminant(poly)];
-end function;
-
-/***************************************************************************
- * Separability conditions via nonequality of individual variables
- ***************************************************************************/ 
-
-function SeparabilityConditionsApart(vars)
-    return [ vars[j] - vars[i] : j in [1..(i-1)], i in [2..#vars]];
-end function;
-
-/***************************************************************************
  * 
  ***************************************************************************/
 
