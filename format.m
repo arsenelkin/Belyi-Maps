@@ -1,3 +1,15 @@
+/********************************************************************
+ * Author: Arsen Elkin
+ * Affiliation: University of Warwick
+ * Date: 11/04/2012
+ * Disclaimer: Provided as is. No guarantees.
+ ********************************************************************
+ *
+ * This file provides the record formats for storing Belyi covers
+ * and for loading and saving them.
+ *
+ ********************************************************************/
+
 load "utils.m";
 
 /********************************************************************
@@ -23,7 +35,7 @@ G0BelyiRecord := recformat<
                             degree:     RngIntElt                            
                             >;
 
-IsG0BelyiRecord := function(record)
+function IsG0BelyiRecord(record)
     // unfortunately, there is no comparator for record formats
     genus := assigned record`genus select record`genus else BelyiGenus(record`passport);
     return genus eq 0;
@@ -52,30 +64,36 @@ HypBelyiRecord := recformat<
                             degree:     RngIntElt
                             >;
                             
-IsHypBelyiRecord := function(record)
+function IsHypBelyiRecord(record)
     // unfortunately, there is no comparator for record formats
     genus := assigned record`genus select record`genus else BelyiGenus(record`passport);
     return genus eq 1 or genus eq 2;
 end function;
 
 /********************************************************************
- * Utilities
+ * Convert a polynomial with coefficients defined over a number field
+ * to a sequence of sequences representing the components of its
+ * coefficients with respect to a given basis. 
  ********************************************************************/
 
-NFPolyToSeq := func< poly | [Eltseq(c) : c in Coefficients(poly)] >;
+function NFPolyToSeq(poly)
+    return [Eltseq(c) : c in Coefficients(poly)];
+end function;
 
-NFPolyToString := func< poly | ListOfListsToString(NFPolyToSeq(poly)) >;
+function NFPolyToString(poly)
+    return ListOfListsToString(NFPolyToSeq(poly));
+end function;
 
 /********************************************************************
  * Convert a passport, curve, and a cover into a Belyi record
  ********************************************************************/
 
-MakeHypBelyiRecord := function(phi : 
+function MakeHypBelyiRecord(phi : 
                                passport := BelyiPassport(phi), 
                                curve := Curve(Parent(phi)),
                                field := BaseRing(curve)
                                )
-    poly_f, poly_h, poly_p, poly_q, poly_r := ExtractHypPolys(curve, phi);
+    poly_f, poly_h, poly_p, poly_q, poly_r := Explode(HyperellipticMapToPolynomials(phi));
     return rec< HypBelyiRecord |
                 passport := passport,
                 p        := Characteristic(field),
@@ -94,11 +112,13 @@ MakeHypBelyiRecord := function(phi :
 end function;
 
 /********************************************************************
- * Convert a Belyi record into a Belyi map, curve and a field
+ * Convert a Belyi record into a Belyi map, curve and their field
  * of definition
  ********************************************************************/
 
-ReadHypBelyiRecord := function(record)
+ReconstituteCoeffs := func< field, coeffs | [field | coeff : coeff in coeffs] >;
+
+function ReadHypBelyiRecord(record)
     if not assigned record`field then
         K := not assigned record`p or record`p eq 0 
                         select Rationals() else GF(record`p);
@@ -112,21 +132,22 @@ ReadHypBelyiRecord := function(record)
         AssignNames(~field, ["w"]);
     end if;
 
+    KZ := PolynomialRing(field);
     if not assigned record`curve then
-        KZ<z> := PolynomialRing(field);
-        poly_h := KZ ! ReconstituteCoeffs(field, record`coeffs_h);
         poly_f := KZ ! ReconstituteCoeffs(field, record`coeffs_f);
-        poly_p := KZ ! ReconstituteCoeffs(field, record`coeffs_p);
-        poly_q := KZ ! ReconstituteCoeffs(field, record`coeffs_q);
-        poly_r := KZ ! ReconstituteCoeffs(field, record`coeffs_r);
+        poly_h := KZ ! ReconstituteCoeffs(field, record`coeffs_h);
         curve := HyperellipticCurve(poly_f, poly_h);
     else
         curve := record`curve;
     end if;
     
     if not assigned record`phi then
-        F<x, y> := FunctionField(curve);
-        phi := (Evaluate(poly_p, x) + y * Evaluate(poly_q, x)) / Evaluate(poly_r, x);
+        F := FunctionField(curve);
+        x := F.1; y := F.2;
+        ff := func< coeffs | Evaluate(KZ ! ReconstituteCoeffs(field, coeffs), x) >;
+        list := [record`coeffs_p, record`coeffs_q, record`coeffs_r];
+        poly_p, poly_q, poly_r := Explode(MapCar(ff, list));
+        phi := (poly_p + y * poly_q) / poly_r;
     else
         phi := record`phi;
     end if;
@@ -150,7 +171,7 @@ end procedure;
  * Used to avoid loading duplicate records.
  ********************************************************************/
 
-HypBelyiRecordIsEqual := function(A, B)
+function HypBelyiRecordIsEqual(A, B)
     return  A`passport cmpeq B`passport
         and A`p        cmpeq B`p
         and A`defpoly  cmpeq B`defpoly
@@ -185,7 +206,7 @@ end procedure;
  * Convert a passport, curve, and a cover into a Belyi record
  ********************************************************************/
 
-MakeG0BelyiRecord := function(phi :
+function MakeG0BelyiRecord(phi :
                               passport := BelyiPassport(phi), 
                               curve := Curve(Parent(phi)),
                               field := BaseRing(curve)
@@ -210,7 +231,7 @@ end function;
  * Convert a Belyi record into a curve and a cover
  ********************************************************************/
 
-ReadG0BelyiRecord := function(record)
+function ReadG0BelyiRecord(record)
     if not assigned record`field then
         K := not assigned record`p or record`p eq 0 
                         select Rationals() else GF(record`p);
@@ -260,7 +281,7 @@ end procedure;
  * Used to avoid loading duplicate records.
  ********************************************************************/
 
-G0BelyiRecordIsEqual := function(A, B)
+function G0BelyiRecordIsEqual(A, B)
     return  A`passport cmpeq B`passport
         and A`p        cmpeq B`p
         and A`defpoly  cmpeq B`defpoly
@@ -311,7 +332,7 @@ end procedure;
  * Convert a passport, curve, and a cover into a Belyi record
  ********************************************************************/
 
-MakeBelyiRecord := function(phi : 
+function MakeBelyiRecord(phi : 
                                 passport := BelyiPassport(phi)
                                 )
                                 
@@ -330,7 +351,7 @@ end function;
  * Convert a Belyi record into a curve and a cover
  ********************************************************************/
 
-ReadBelyiRecord := function(record)
+function ReadBelyiRecord(record)
     if IsG0BelyiRecord(record) then
         return ReadG0BelyiRecord(record);
     elif IsHypBelyiRecord(record) then
@@ -362,7 +383,7 @@ end procedure;
  * Used to avoid loading duplicate records.
  ********************************************************************/
 
-BelyiRecordIsEqual := function(A, B)
+function BelyiRecordIsEqual(A, B)
     if IsG0BelyiRecord(A) and IsG0BelyiRecord(B) then
         G0BelyiRecordIsEqual(A, B);
     end if;
@@ -392,7 +413,7 @@ end procedure;
  * Name of the database containing Belyi maps with desired passport
  ********************************************************************/
 
-BelyiPassportToCompactString := function(passport, separator)
+function BelyiPassportToCompactString(passport : separator := "-")
     result := "";
     for list in passport do
         result cat:= separator;
@@ -403,10 +424,10 @@ BelyiPassportToCompactString := function(passport, separator)
     return result;
 end function;
 
-BelyiFileName := function(passport)
-    result := "belyi";
-    result cat:= BelyiPassportToCompactString(passport, "-");
-    result cat:= ".m";
+function BelyiFileName(passport : prepend := "belyi", extension := ".m")
+    result := prepend;
+    result cat:= BelyiPassportToCompactString(passport);
+    result cat:= extension;
     return result;
 end function;
 
@@ -414,7 +435,7 @@ end function;
  * The number of Belyi maps with a given passport
  ********************************************************************/
 
-NumberOfBelyiMaps := function(D, passport)    
+function NumberOfBelyiMaps(D, passport)    
     ordered := NormalizeBelyiPassport(passport);
     return IsDefined(D, ordered) select #D[ordered] else 0;
 end function;
@@ -423,7 +444,7 @@ end function;
  * Obtain the i-th Belyi map with a given passport
  ********************************************************************/
 
-BelyiMap := function(D, passport, i)
+function BelyiMap(D, passport, i)
     ordered, alpha := SortingMobiusTransform(passport);
     record := D[ordered][i];
     //FillBelyiRecord(~D[ordered][i]);

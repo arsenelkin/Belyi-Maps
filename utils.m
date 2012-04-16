@@ -1,26 +1,45 @@
-//load "splitting.m";
-
 /********************************************************************
+ * Author: Arsen Elkin
+ * Affiliation: University of Warwick
+ * Date: 11/04/2012
+ * Disclaimer: Provided as is. No guarantees.
+ ********************************************************************
+ *
  * This file provides utilities for dealing with Belyi covers,
- * computation of their invariants, validation,
- * assignment of variables, etc. 
+ * computation of their invariants, validation, assignment of variables, etc. 
+ *
+ *
+ * function BelyiDegree(passport)
+ *                  - degree of a Belyi passport
+ * function BelyiGenus(passport)
+ *                  - genus of a Belyi passport
+ * function BelyiPassport(f)    
+ *                  - Belyi passport of algebraic function f
+ *
  ********************************************************************/
 
 
+forward MapCar, MapCar2, MapCar3, MapCar4;
+        
 
 /*****************************************************************
  * Riemann-Hurwitz genus formulas
  *****************************************************************/
 
 // Degree of a belyi cover
-BelyiDegree := func< passport | &+passport[1] >;
+function BelyiDegree(passport)
+    return &+passport[1];
+end function;
 
 // Genus of a belyi cover
-BelyiTwiceGenus := func< passport : deg := BelyiDegree(passport) | 
-	-2*deg + 2 + &+[&+[i-1 : i in passport[j]]: j in [1..#passport]] >;
+function BelyiTwiceGenus(passport)
+    deg := BelyiDegree(passport);
+    return -2*deg + 2 + &+[&+[i-1 : i in passport[j]]: j in [1..#passport]];
+end function;
 
-BelyiGenus := func< passport : deg := BelyiDegree(passport) | 
-	 BelyiTwiceGenus(passport : deg := deg) div 2 >;
+function BelyiGenus(passport)
+	 return BelyiTwiceGenus(passport) div 2;
+end function;
 
 // Genus of a belyi cover, quick version
 BelyiTwiceGenusEZ := func< passport  : deg := BelyiDegree(passport) | 
@@ -50,7 +69,7 @@ end function;
 
 
 // TODO: optimize this
-RamificationOrders := function(f)
+function RamificationOrders(f)
     places, orders := Support(Divisor(f));
     degrees := [Degree(d) : d in places];
     results := Flat([[orders[i] : j in [1..degrees[i]]] : i in [1..#orders] ]);
@@ -59,7 +78,7 @@ RamificationOrders := function(f)
     return ni, n0;
 end function;
 
-BelyiPassport := function(f)
+function BelyiPassport(f)
     ni0, n0 := RamificationOrders(f);
     ni1, n1 := RamificationOrders(f - 1);
 
@@ -69,7 +88,7 @@ BelyiPassport := function(f)
 end function;
 
 // This is to speed comparisons up
-HasBelyiPassport := function(f, passport)
+function HasBelyiPassport(f, passport)
     ni0, n0 := RamificationOrders(f);
     if ni0 ne passport[1] or n0 ne passport[2] then
         return false;
@@ -84,7 +103,7 @@ end function;
  * Validate ramification data
  *****************************************************************/
 
-ValidatePassport := function(passport)
+function ValidatePassport(passport)
     if Type(passport) cmpne SeqEnum or #passport ne 3 then
         return false;
     end if;
@@ -105,38 +124,52 @@ ValidatePassport := function(passport)
 end function;
 
 /*****************************************************************
- * Create array with variables and their names
+ * Create polynomial ring with appropriately named variables
+ * Example: GeneratePolynomialRing(K, [<"a", 2, 0>, <"b", 2, 1><"q", 1, -1>])
+ * returns K<a0, a1, b1, b2, q><x> and [[a0, a1], [b1, b2], [q]]
+ *
+ * The first item is the name of the variables
+ * The second item is the number of variables with this name desired
+ * The third item is the starting index. 
+ *      -1 indicated no indexing, which only works with the second item equal to 1
+ *
  *****************************************************************/
+ 
+VarNames := func< param | 
+        [param[1] cat (param[3] eq -1 select "" else IntegerToString(param[3] + i)) 
+        : i in [0..(param[2] - 1)] ] >;
 
-FillInVars := function(KK, varname, nvars, disp, start)
-	vars := [KK | KK.(disp + i) : i in [1..nvars]];
-	varnames := [varname cat IntegerToString(i-1+start) : i in [1..nvars]];	
-	disp +:= nvars;
-	return vars, varnames, disp;
+function GeneratePolynomialRing(K, params)
+    nvars := &+[elt[2] : elt in params];
+    KK := PolynomialRing(K, nvars);
+        
+    varnames := &cat[ VarNames(param) : param in params ];
+    AssignNames(~KK, varnames);
+    
+    variables := [];
+    base := 1;
+    for param in params do
+        length := param[2];
+        Append(~variables, [KK | KK.(base + i) : i in [0..(length - 1)] ]);
+        base +:= length;
+    end for;
+
+    return PolynomialRing(KK), variables;
 end function;
-
 
 /*****************************************************************
  * Validate ramification data
  *****************************************************************/
 
-CastPoint := func< pt, K | [K ! c : c in Eltseq(pt)] >;
-
-CastPoints := func< pts, K | [CastPoint(pt, K) : pt in Seqelt(pts)] >;
-
-CastEquations := function(eqns, K)
-	KK := Universe(eqns);
-	rank := Rank(KK);
-	KX := PolynomialRing(K, rank);
-	AssignNames(~KX, Names(KK));
-	return [KX ! eqn : eqn in eqns];
+function CastPoint(pt, K)
+    return [K ! c : c in Eltseq(pt)];
 end function;
 
 /*****************************************************************
  * All-possible-selections function
  *****************************************************************/
 
-AllPossibleSelections := function(list)
+function AllPossibleSelections(list)
 	maxes := [#l : l in list];
 	indices := CartesianProduct([[1..max] : max in maxes]);
 	result := {[list[i][elt[i]] : i in [1..#elt]] : elt in indices};
@@ -147,7 +180,7 @@ end function;
  * Separability conditions via discriminant
  ***************************************************************************/
 
-SeparabilityConditionsTogether := function(vars)
+function SeparabilityConditionsTogether(vars)
     KX := PolynomialRing(Universe(vars));
     x := KX.1;
     poly := &*[ KX | x - var : var in vars];
@@ -158,36 +191,46 @@ end function;
  * Separability conditions via nonequality of individual variables
  ***************************************************************************/ 
 
-SeparabilityConditionsApart := function(vars)
+function SeparabilityConditionsApart(vars)
     return [ vars[j] - vars[i] : j in [1..(i-1)], i in [2..#vars]];
 end function;
 
 /***************************************************************************
- * Find a minimal field of definition for a list of numbers
+ * 
  ***************************************************************************/
 
-HyperellipticCoefficients := function(f)
+function HyperellipticCoefficients(f)
     coeffs := [Coefficients(c)[1] : c in Coefficients(f, 1)];
     return coeffs cat [ 0 : i in [#coeffs .. 1]];
 end function;
 
-HyperellipticConjugate := function(f)
-    F := Parent(f);
-    x := F.1;    
+function HyperellipticConjugate(phi)
+    F := Parent(phi);
     y := F.2;
     _, h := HyperellipticPolynomials(Curve(F));
-    C := HyperellipticCoefficients(f);
-    return Evaluate(C[1],x) - Evaluate(C[2],x) * (y + Evaluate(h, x));
+    a, b := Explode(HyperellipticCoefficients(phi));
+    return a - b * (y + h);
 end function;
 
-HyperellipticNorm := function(f)
-    return f * HyperellipticConjugate(f);
+/***************************************************************************
+ * Given a Belyi map a(x) + b(x) * y on the curve
+ * y^2 + h(x) * y = f(x) returns its "norm"  a^2 - a * b * h - f * b^2.
+ * This formula is an analogy to the case of a quadratic number fields.
+ ***************************************************************************/
+  
+function HyperellipticNorm(phi)
+    f, h := HyperellipticPolynomials(Curve(Parent(phi)));
+    a, b := Explode(HyperellipticCoefficients(phi));
+    f := Parent(a) ! f;
+    h := Parent(a) ! h; 
+    return a^2 - a * b * h - f * b^2;
 end function;
 
-//
-// for f = (p(x) + y * q(x))/r(x), returns p, q, r.
-//
-DecomposeHypFunction := function(f)
+/***************************************************************************
+ * For f = (p(x) + y * q(x))/r(x) on a hyperelliptic curve, 
+ * returns polynomials p, q, r.
+ ***************************************************************************/
+function DecomposeHypFunction(f)
     coeffs := HyperellipticCoefficients(f);
     denom := Denominator(coeffs[1]);
     num1 := Numerator(coeffs[1]);
@@ -199,31 +242,29 @@ DecomposeHypFunction := function(f)
     return num1, num2, denom;
 end function;
 
-DecomposeG0Function := function(f)
+function DecomposeG0Function(f)
     coeffs := Coefficients(f);
     g := IsEmpty(coeffs) select Zero(Universe(coeffs)) else coeffs[1];
     return Numerator(g), Denominator(g);
 end function;
 
-ReconstituteCoeffs := func< field, list | [field | field ! coeff : coeff in list] >;
+/***************************************************************************
+ * Given a Belyi map (p(x) + q(x) * y) / r(x) on the curve
+ * y^2 + h(x) * y = f(x) returns the sequence [f, h, p, q, r] of polynomials
+ ***************************************************************************/
 
-ExtractHypPolys := function(E, phi)
+function HyperellipticMapToPolynomials(phi)
+    E := Curve(Parent(phi));
     poly_f, poly_h := HyperellipticPolynomials(E);
     poly_p, poly_q, poly_r := DecomposeHypFunction(phi);
-    
-    poly_a := HyperellipticNorm(phi * poly_r);
-    poly_a := Numerator(Coefficients(poly_a)[1]);
-    poly_b := HyperellipticNorm((phi - 1) * poly_r);
-    poly_b := Numerator(Coefficients(poly_b)[1]);
-    
-    return poly_f, poly_h, poly_p, poly_q, poly_r, poly_a, poly_b;
+    return [poly_f, poly_h, poly_p, poly_q, poly_r];
 end function;
 
 /***************************************************************************
  * 
  ***************************************************************************/
 
-EllipticCurveCoeffsByJAndD := function(j, d)
+function EllipticCurveCoeffsByJAndD(j, d)
     U := CoveringStructure(Parent(j), Parent(d));
     if j eq 0 then
         return [U | 0, d^3];
@@ -234,7 +275,7 @@ EllipticCurveCoeffsByJAndD := function(j, d)
     return [U | -27 * d^2 * j * (j - 1728), 54 * d^3 * j * (j-1728)^2];
 end function;
 
-EllipticCurveByJAndD := function(j, d)
+function EllipticCurveByJAndD(j, d)
     return EllipticCurve(EllipticCurveCoeffsByJAndD(j, d));
 end function;
 
@@ -245,59 +286,10 @@ end function;
 CountOccurrences := func<list, elt | &+[1 : e in list | e eq elt] >;
 
 /***********************************************************************************
- * Factorization routines
- ***********************************************************************************/
-
-IrredicibleDivisors := func< poly | 
-                IsZero(poly)    select {@ Parent(poly) | @}
-                                else {@ Parent(poly) | fc[1] : fc in Factorization(poly) @} >;
-
-//
-// Figure out the factors of poly appearing in the list factors, their powers
-// and the leftovers
-//
-ExtractFactorsRepresentation := function(poly, factors)
-    if IsZero(poly) then
-        return [], Parent(poly) ! 0;
-    end if;
-
-    fact := [];
-    other := Parent(poly) ! LeadingCoefficient(poly);
-    for fc in Factorization(poly) do
-        index := Index(factors, fc[1]);
-        if index eq 0 then
-            other *:= fc[1]^fc[2];
-        else
-            Append(~fact, <index, fc[2]>);
-        end if;
-    end for;
-    return fact, other;
-end function;
-
-TruncatedCoefficients := func<poly | Coefficients(poly)[1..Degree(poly)] >;
-
-MakeUpFactors := function(KK, factors)
-    KX<x> := PolynomialRing(KK);
-    result := {@ KX | @};
-    i := 1;
-    for poly in factors do
-        deg := Degree(poly);
-        coeffs := [KK.j : j in [i..(i+deg-1)]] cat [1];
-        result join:= {@ KX ! coeffs @};
-        i +:= deg;
-    end for;
-    return result;
-end function;
-
-ReconsituteFactorPattern:= function(other, factors, pattern)
-    return other * &*[Universe(factors) | factors[patt[1]]^patt[2] : patt in pattern ];
-end function;
-
-/***********************************************************************************
  * Printing routines
  ***********************************************************************************/
 
-ListToString := function(L)
+function ListToString(L)
     if IsEmpty(L) then
         return "[]";
     end if;
@@ -312,7 +304,7 @@ ListToString := function(L)
     return result;
 end function;
 
-ListOfListsToString := function(passport)
+function ListOfListsToString(passport)
     if IsEmpty(passport) then
         return "[]";
     end if;
@@ -355,7 +347,7 @@ BelyiPassportToString := ListOfListsToString;
  *
  ***********************************************************************************/
 
-SortingMobiusTransform := function(passport)
+function SortingMobiusTransform(passport)
     ordered := [Sort(list, reverse_comp) : list in passport];
     KX := RationalFunctionField(Integers());
     x := KX.1;
@@ -402,7 +394,7 @@ NormalizeBelyiPassport := func< passport |
  * JInvariant of an elliptic curve given by a cubic or quartic polynomial
  ***********************************************************************************/
 
-JInvariant := function(C)
+function JInvariant(C)
     if Type(C) eq CrvEll then
         return jInvariant(C);
     end if;
@@ -421,4 +413,42 @@ JInvariant := function(C)
     num := -27*s1^3*s3^3 + 27*s1^2*s2^2*s3^2 + 324*s1^2*s3^2*s4 - 9*s1*s2^4*s3 - 216*s1*s2^2*s3*s4 - 1296*s1*s3*s4^2 + s2^6 + 36*s2^4*s4 + 432*s2^2*s4^2 + 1728*s4^3;
     den := -27*s1^4*s4^2 + 18*s1^3*s2*s3*s4 - 4*s1^3*s3^3 - 4*s1^2*s2^3*s4 + s1^2*s2^2*s3^2 + 144*s1^2*s2*s4^2 - 6*s1^2*s3^2*s4 - 80*s1*s2^2*s3*s4 + 18*s1*s2*s3^3 - 192*s1*s3*s4^2 + 16*s2^4*s4 - 4*s2^3*s3^2 - 128*s2^2*s4^2 + 144*s2*s3^2*s4 - 27*s3^4 + 256*s4^3;
     return 256 * num / den;
+end function;
+
+/***********************************************************************************
+ * Lisp's MapCar function. Applies f to corresponding elements of args1 and args2,
+ * accumulating the results.
+ *
+ * The functionality is different from Lisp's mapcar in that the lengths of multiple
+ * arguments must be the same. This is to avoid unintended consequences.
+ *
+ ***********************************************************************************/
+
+function MapCar(f, args : Range := false)
+    return Range cmpeq false select [ f(arg) : arg in args ]
+                            else [Range | f(arg) : arg in args ];
+end function;
+
+function MapCar2(f, args1, args2 : Range := false)
+    n := #args1;
+    assert n eq #args2;
+    range := [1 .. n];
+    return Range cmpeq false select [ f(args1[i], args2[i]) : i in range ]
+                            else [ Range | f(args1[i], args2[i]) : i in range ];
+end function;
+
+function MapCar3(f, args1, args2, args3 : Range := false)
+    n := #args1;
+    assert n eq #args2 and n eq #args3;
+    range := [1 .. n];
+    return Range cmpeq false select [ f(args1[i], args2[i], args3[i]) : i in range ]
+                            else [ Range | f(args1[i], args2[i], args3[i]) : i in range ];
+end function;
+
+function MapCar4(f, args1, args2, args3, args4 : Range := false)
+    n := #args1;
+    assert n eq #args2 and n eq #args3 and n eq #args4;
+    range := [1 .. n];
+    return Range cmpeq false select [ f(args1[i], args2[i], args3[i], args4[i]) : i in range ]
+                            else [ Range | f(args1[i], args2[i], args3[i], args4[i]) : i in range ];
 end function;
