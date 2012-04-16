@@ -18,6 +18,7 @@ load "format.m";
 function BelyiMapDatabase( : dir := "data/")
     filelist := Open(dir cat "filelist.dat", "r");
     database := AssociativeArray();
+    data := "";
     while true do
         line := Gets(filelist);
         if IsEof(line) then
@@ -26,8 +27,20 @@ function BelyiMapDatabase( : dir := "data/")
         if line eq "" then
             continue;
         end if;
-        array := eval(Read(dir cat line));
-        database[array[1]] := array[2];
+        try
+            delete data;
+            fname := dir cat line;
+            data := Read(fname);
+            array := eval(data);
+            database[array[1]] := array[2];
+        catch e
+            if assigned data then
+                print "Error reading data file", fname;
+            else
+                print "Error opening data file ", fname;
+            end if;
+            error e;    // rethrow
+        end try;
     end while;
 
     delete filelist;
